@@ -86,8 +86,13 @@
     KIFTestStepResult result;
     NSError *internalError;
     
+    BOOL hasNotifiedLooking = NO;
     while ((result = executionBlock(&internalError)) == KIFTestStepResultWait && -[startDate timeIntervalSinceNow] < timeout) {
         CFRunLoopRunInMode([[UIApplication sharedApplication] currentRunLoopMode] ?: kCFRunLoopDefaultMode, KIFTestStepDelay, false);
+        if(!hasNotifiedLooking && (-[startDate timeIntervalSinceNow] > timeout * 0.4)){
+            [[NSNotificationCenter defaultCenter] postNotificationName:[NSString stringWithFormat:@"KIF_EXECUTION_IS_PARTWAY_WITH_ERROR"] object:internalError];
+            hasNotifiedLooking = YES;
+        }
     }
 
     if (result == KIFTestStepResultWait) {
@@ -102,7 +107,9 @@
     if (error) {
         *error = internalError;
     }
-    
+    if (result == KIFTestStepResultFailure) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"KIF_TEST_STEP_FAILURE" object:@{@"error":internalError, @"sender": self}];
+    }
     return result != KIFTestStepResultFailure;
 }
 
