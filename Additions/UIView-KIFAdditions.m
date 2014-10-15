@@ -44,19 +44,19 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     if (expected == actual) {
         return YES;
     }
-    
+
     if (expected.length != actual.length) {
         return NO;
     }
-    
+
     if ([expected isEqualToString:actual]) {
         return YES;
     }
-    
+
     if ([expected rangeOfString:@"\n"].location == NSNotFound) {
         return NO;
     }
-    
+
     for (NSUInteger i = 0; i < expected.length; i ++) {
         unichar expectedChar = [expected characterAtIndex:i];
         unichar actualChar = [actual characterAtIndex:i];
@@ -64,7 +64,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
             return NO;
         }
     }
-    
+
     return YES;
 }
 
@@ -80,7 +80,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
         // so don't recurse into a date picker when searching for matching accessibility elements
         classesToSkip = [[NSSet alloc] initWithObjects:[UIDatePicker class], nil];
     });
-    
+
     return classesToSkip;
 }
 
@@ -97,7 +97,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
 - (UIAccessibilityElement *)accessibilityElementWithLabel:(NSString *)label accessibilityValue:(NSString *)value traits:(UIAccessibilityTraits)traits;
 {
     return [self accessibilityElementMatchingBlock:^(UIAccessibilityElement *element) {
-        
+
         // TODO: This is a temporary fix for an SDK defect.
         NSString *accessibilityValue = nil;
         @try {
@@ -106,11 +106,11 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
         @catch (NSException *exception) {
             NSLog(@"KIF: Unable to access accessibilityValue for element %@ because of exception: %@", element, exception.reason);
         }
-        
+
         if ([accessibilityValue isKindOfClass:[NSAttributedString class]]) {
             accessibilityValue = [(NSAttributedString *)accessibilityValue string];
         }
-        
+
         BOOL labelsMatch = StringsMatchExceptLineBreaks(label, element.accessibilityLabel);
         BOOL traitsMatch = ((element.accessibilityTraits) & traits) == traits;
         BOOL valuesMatch = !value || [value isEqual:accessibilityValue];
@@ -129,10 +129,10 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     if (notHidden && self.hidden) {
         return nil;
     }
-    
+
     // In case multiple elements with the same label exist, prefer ones that are currently visible
     UIAccessibilityElement *matchingButOccludedElement = nil;
-    
+
     BOOL elementMatches = matchBlock((UIAccessibilityElement *)self);
 
     if (elementMatches) {
@@ -142,11 +142,11 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
             matchingButOccludedElement = (UIAccessibilityElement *)self;
         }
     }
-    
+
     if ([[[self class] classesToSkipAccessibilitySearchRecursion] containsObject:[self class]]) {
         return matchingButOccludedElement;
     }
-    
+
     // Check the subviews first. Even if the receiver says it's an accessibility container,
     // the returned objects are UIAccessibilityElementMockViews (which aren't actually views)
     // rather than the real subviews it contains. We want the real views if possible.
@@ -156,23 +156,23 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
         if (!element) {
             continue;
         }
-        
+
         UIView *viewForElement = [UIAccessibilityElement viewContainingAccessibilityElement:element];
         CGRect accessibilityFrame = [viewForElement.window convertRect:element.accessibilityFrame toView:viewForElement];
-        
+
         if ([viewForElement isTappableInRect:accessibilityFrame]) {
             return element;
         } else {
             matchingButOccludedElement = element;
         }
     }
-    
+
     NSMutableArray *elementStack = [NSMutableArray arrayWithObject:self];
-    
+
     while (elementStack.count) {
         UIAccessibilityElement *element = [elementStack lastObject];
         [elementStack removeLastObject];
-        
+
         BOOL elementMatches = matchBlock(element);
 
         if (elementMatches) {
@@ -186,34 +186,34 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
                 continue;
             }
         }
-        
+
         // If the view is an accessibility container, and we didn't find a matching subview,
         // then check the actual accessibility elements
         NSInteger accessibilityElementCount = element.accessibilityElementCount;
         if (accessibilityElementCount == 0 || accessibilityElementCount == NSNotFound) {
             continue;
         }
-        
+
         for (NSInteger accessibilityElementIndex = 0; accessibilityElementIndex < accessibilityElementCount; accessibilityElementIndex++) {
             UIAccessibilityElement *subelement = [element accessibilityElementAtIndex:accessibilityElementIndex];
-            
+
             if (subelement) {
                 // Skip table view cell accessibility elements, they're handled below
                 if ([subelement isKindOfClass:NSClassFromString(@"UITableViewCellAccessibilityElement")]) {
                     continue;
                 }
-                
+
                 [elementStack addObject:subelement];
             }
         }
     }
-    
+
     if (!matchingButOccludedElement) {
         if ([self isKindOfClass:[UITableView class]]) {
             UITableView *tableView = (UITableView *)self;
-            
+
             NSArray *indexPathsForVisibleRows = [tableView indexPathsForVisibleRows];
-            
+
             for (NSUInteger section = 0, numberOfSections = [tableView numberOfSections]; section < numberOfSections; section++) {
                 for (NSUInteger row = 0, numberOfRows = [tableView numberOfRowsInSection:section]; row < numberOfRows; row++) {
                     // Skip visible rows because they are already handled
@@ -221,35 +221,35 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
                     if ([indexPathsForVisibleRows containsObject:indexPath]) {
                         continue;
                     }
-                    
+
                     @autoreleasepool {
                         // Get the cell directly from the dataSource because UITableView will only vend visible cells
                         UITableViewCell *cell = [tableView.dataSource tableView:tableView cellForRowAtIndexPath:indexPath];
-                        
+
                         UIAccessibilityElement *element = [cell accessibilityElementMatchingBlock:matchBlock notHidden:NO];
-                        
+
                         // Remove the cell from the table view so that it doesn't stick around
                         [cell removeFromSuperview];
-                        
+
                         // Skip this cell if it isn't the one we're looking for
                         if (!element) {
                             continue;
                         }
                     }
-                    
+
                     // Scroll to the cell and wait for the animation to complete
                     [tableView scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionNone animated:YES];
                     CFRunLoopRunInMode(UIApplicationCurrentRunMode, 0.5, false);
-                    
+
                     // Now try finding the element again
                     return [self accessibilityElementMatchingBlock:matchBlock];
                 }
             }
         } else if ([self isKindOfClass:[UICollectionView class]]) {
             UICollectionView *collectionView = (UICollectionView *)self;
-            
+
             NSArray *indexPathsForVisibleItems = [collectionView indexPathsForVisibleItems];
-            
+
             for (NSUInteger section = 0, numberOfSections = [collectionView numberOfSections]; section < numberOfSections; section++) {
                 for (NSUInteger item = 0, numberOfItems = [collectionView numberOfItemsInSection:section]; item < numberOfItems; item++) {
                     // Skip visible items because they are already handled
@@ -257,34 +257,34 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
                     if ([indexPathsForVisibleItems containsObject:indexPath]) {
                         continue;
                     }
-                    
+
                     @autoreleasepool {
                         // Get the cell directly from the dataSource because UICollectionView will only vend visible cells
                         UICollectionViewCell *cell = [collectionView.dataSource collectionView:collectionView cellForItemAtIndexPath:indexPath];
-                        
+
                         UIAccessibilityElement *element = [cell accessibilityElementMatchingBlock:matchBlock notHidden:NO];
-                        
+
                         // Remove the cell from the collection view so that it doesn't stick around
                         [cell removeFromSuperview];
-                        
+
                         // Skip this cell if it isn't the one we're looking for
                         // Sometimes we get cells with no size here which can cause an endless loop, so we ignore those
                         if (!element || CGSizeEqualToSize(cell.frame.size, CGSizeZero)) {
                             continue;
                         }
                     }
-                    
+
                     // Scroll to the cell and wait for the animation to complete
                     [collectionView scrollToItemAtIndexPath:indexPath atScrollPosition:UICollectionViewScrollPositionNone animated:YES];
                     CFRunLoopRunInMode(UIApplicationCurrentRunMode, 0.5, false);
-                    
+
                     // Now try finding the element again
                     return [self accessibilityElementMatchingBlock:matchBlock];
                 }
             }
         }
     }
-        
+
     return matchingButOccludedElement;
 }
 
@@ -294,14 +294,14 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     if ([subviews count] == 0) {
         return nil;
     }
-    
+
     return subviews[0];
 }
 
 - (NSArray *)subviewsWithClassNamePrefix:(NSString *)prefix;
 {
     NSMutableArray *result = [NSMutableArray array];
-    
+
     // Breadth-first population of matching subviews
     // First traverse the next level of subviews, adding matches.
     for (UIView *view in self.subviews) {
@@ -309,7 +309,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
             [result addObject:view];
         }
     }
-    
+
     // Now traverse the subviews of the subviews, adding matches.
     for (UIView *view in self.subviews) {
         NSArray *matchingSubviews = [view subviewsWithClassNamePrefix:prefix];
@@ -325,14 +325,14 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     if ([subviews count] == 0) {
         return nil;
     }
-    
+
     return subviews[0];
 }
 
 - (NSArray *)subviewsWithClassNameOrSuperClassNamePrefix:(NSString *)prefix;
 {
     NSMutableArray * result = [NSMutableArray array];
-    
+
     // Breadth-first population of matching subviews
     // First traverse the next level of subviews, adding matches
     for (UIView *view in self.subviews) {
@@ -342,11 +342,11 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
                 [result addObject:view];
                 break;
             }
-            
+
             klass = [klass superclass];
         }
     }
-    
+
     // Now traverse the subviews of the subviews, adding matches
     for (UIView *view in self.subviews) {
         NSArray * matchingSubviews = [view subviewsWithClassNameOrSuperClassNamePrefix:prefix];
@@ -380,7 +380,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
 - (void)tap;
 {
     CGPoint centerPoint = CGPointMake(self.frame.size.width * 0.5f, self.frame.size.height * 0.5f);
-    
+
     [self tapAtPoint:centerPoint];
 }
 
@@ -390,27 +390,27 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     // This may not be necessary anymore. We didn't properly support controls that used gesture recognizers
     // when this was added, but we now do. It needs to be tested before we can get rid of it.
     id /*UIWebBrowserView*/ webBrowserView = nil;
-    
+
     if ([NSStringFromClass([self class]) isEqual:@"UIWebBrowserView"]) {
         webBrowserView = self;
     } else if ([self isKindOfClass:[UIWebView class]]) {
         id webViewInternal = [self valueForKey:@"_internal"];
         webBrowserView = [webViewInternal valueForKey:@"browserView"];
     }
-    
+
     if (webBrowserView) {
         [webBrowserView tapInteractionWithLocation:point];
         return;
     }
-    
+
     // Handle touches in the normal way for other views
     UITouch *touch = [[UITouch alloc] initAtPoint:point inView:self];
     [touch setPhaseAndUpdateTimestamp:UITouchPhaseBegan];
-    
+
     UIEvent *event = [self eventWithTouch:touch];
 
     [[UIApplication sharedApplication] sendEvent:event];
-    
+
     [touch setPhaseAndUpdateTimestamp:UITouchPhaseEnded];
     [[UIApplication sharedApplication] sendEvent:event];
 
@@ -444,31 +444,31 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
 {
     UITouch *touch = [[UITouch alloc] initAtPoint:point inView:self];
     [touch setPhaseAndUpdateTimestamp:UITouchPhaseBegan];
-    
+
     UIEvent *eventDown = [self eventWithTouch:touch];
     [[UIApplication sharedApplication] sendEvent:eventDown];
-    
+
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, DRAG_TOUCH_DELAY, false);
-    
+
     for (NSTimeInterval timeSpent = DRAG_TOUCH_DELAY; timeSpent < duration; timeSpent += DRAG_TOUCH_DELAY)
     {
         [touch setPhaseAndUpdateTimestamp:UITouchPhaseStationary];
-        
+
         UIEvent *eventStillDown = [self eventWithTouch:touch];
         [[UIApplication sharedApplication] sendEvent:eventStillDown];
-        
+
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, DRAG_TOUCH_DELAY, false);
     }
-    
+
     [touch setPhaseAndUpdateTimestamp:UITouchPhaseEnded];
     UIEvent *eventUp = [self eventWithTouch:touch];
     [[UIApplication sharedApplication] sendEvent:eventUp];
-    
+
     // Dispatching the event doesn't actually update the first responder, so fake it
     if ([touch.view isDescendantOfView:self] && [self canBecomeFirstResponder]) {
         [self becomeFirstResponder];
     }
-    
+
 }
 
 - (void)dragFromPoint:(CGPoint)startPoint toPoint:(CGPoint)endPoint;
@@ -533,7 +533,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
             }
             UIEvent *eventDown = [self eventWithTouches:[NSArray arrayWithArray:touches]];
             [[UIApplication sharedApplication] sendEvent:eventDown];
-            
+
             CFRunLoopRunInMode(UIApplicationCurrentRunMode, DRAG_TOUCH_DELAY, false);
         }
         else
@@ -676,26 +676,26 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
 - (BOOL)hasTapGestureRecognizer
 {
     __block BOOL hasTapGestureRecognizer = NO;
-    
+
     [self.gestureRecognizers enumerateObjectsUsingBlock:^(id obj,
                                                           NSUInteger idx,
                                                           BOOL *stop) {
         if ([obj isKindOfClass:[UITapGestureRecognizer class]]) {
             hasTapGestureRecognizer = YES;
-            
+
             if (stop != NULL) {
                 *stop = YES;
             }
         }
     }];
-    
+
     return hasTapGestureRecognizer;
 }
 
 - (BOOL)isTappableInRect:(CGRect)rect;
 {
     CGPoint tappablePoint = [self tappablePointInRect:rect];
-    
+
     return !isnan(tappablePoint.x);
 }
 
@@ -709,13 +709,13 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     if ([hitView isKindOfClass:[UIControl class]] && [self isDescendantOfView:hitView]) {
         return YES;
     }
-    
+
     // Button views in the nav bar (a private class derived from UINavigationItemView), do not return
     // themselves in a -hitTest:. Instead they return the nav bar.
     if ([hitView isKindOfClass:[UINavigationBar class]] && [self isNavigationItemView] && [self isDescendantOfView:hitView]) {
         return YES;
     }
-    
+
     return [hitView isDescendantOfView:self];
 }
 
@@ -723,45 +723,45 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
 {
     // Start at the top and recurse down
     CGRect frame = [self.window convertRect:rect fromView:self];
-    
+
     UIView *hitView = nil;
     CGPoint tapPoint = CGPointZero;
-    
+
     // Mid point
     tapPoint = CGPointCenteredInRect(frame);
     hitView = [self.window hitTest:tapPoint withEvent:nil];
     if ([self isTappableWithHitTestResultView:hitView]) {
         return [self.window convertPoint:tapPoint toView:self];
     }
-    
+
     // Top left
     tapPoint = CGPointMake(frame.origin.x + 1.0f, frame.origin.y + 1.0f);
     hitView = [self.window hitTest:tapPoint withEvent:nil];
     if ([self isTappableWithHitTestResultView:hitView]) {
         return [self.window convertPoint:tapPoint toView:self];
     }
-    
+
     // Top right
     tapPoint = CGPointMake(frame.origin.x + frame.size.width - 1.0f, frame.origin.y + 1.0f);
     hitView = [self.window hitTest:tapPoint withEvent:nil];
     if ([self isTappableWithHitTestResultView:hitView]) {
         return [self.window convertPoint:tapPoint toView:self];
     }
-    
+
     // Bottom left
     tapPoint = CGPointMake(frame.origin.x + 1.0f, frame.origin.y + frame.size.height - 1.0f);
     hitView = [self.window hitTest:tapPoint withEvent:nil];
     if ([self isTappableWithHitTestResultView:hitView]) {
         return [self.window convertPoint:tapPoint toView:self];
     }
-    
+
     // Bottom right
     tapPoint = CGPointMake(frame.origin.x + frame.size.width - 1.0f, frame.origin.y + frame.size.height - 1.0f);
     hitView = [self.window hitTest:tapPoint withEvent:nil];
     if ([self isTappableWithHitTestResultView:hitView]) {
         return [self.window convertPoint:tapPoint toView:self];
     }
-    
+
     return CGPointMake(NAN, NAN);
 }
 
@@ -769,7 +769,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
 {
     // _touchesEvent is a private selector, interface is exposed in UIApplication(KIFAdditionsPrivate)
     UIEvent *event = [[UIApplication sharedApplication] _touchesEvent];
-    
+
     [event _clearTouches];
     [event kif_setEventWithTouches:touches];
 
@@ -789,7 +789,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
 - (BOOL)isUserInteractionActuallyEnabled;
 {
     BOOL isUserInteractionEnabled = self.userInteractionEnabled;
-    
+
     // Navigation item views don't have user interaction enabled, but their parent nav bar does and will forward the event
     if (!isUserInteractionEnabled && [self isNavigationItemView]) {
         // If this view is inside a nav bar, and the nav bar is enabled, then consider it enabled
@@ -801,7 +801,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
             isUserInteractionEnabled = YES;
         }
     }
-    
+
     // UIActionsheet Buttons have UIButtonLabels with userInteractionEnabled=NO inside,
     // grab the superview UINavigationButton instead.
     if (!isUserInteractionEnabled && [self isKindOfClass:NSClassFromString(@"UIButtonLabel")]) {
@@ -813,7 +813,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
             isUserInteractionEnabled = YES;
         }
     }
-    
+
     return isUserInteractionEnabled;
 }
 
@@ -827,13 +827,13 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     if (CGAffineTransformIsIdentity(self.window.transform)) {
         return self.window;
     }
-    
+
     for (UIWindow *window in [[UIApplication sharedApplication] windowsWithKeyWindow]) {
         if (CGAffineTransformIsIdentity(window.transform)) {
             return window;
         }
     }
-    
+
     return nil;
 }
 
@@ -863,7 +863,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     if (*stop) {
         return;
     }
-    
+
     for (UIView *view in self.subviews) {
         [view performBlockOnDescendentViews:block stop:stop];
         if (*stop) {
@@ -903,7 +903,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
 }
 
 - (void)printAccessibilityTraits:(UIAccessibilityTraits)traits {
-    
+
     printf("traits: ");
     bool didPrintOne = false;
     if(traits == UIAccessibilityTraitNone) {
@@ -1012,7 +1012,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     if(self.hidden) {
         printf(" (invisible)");
     }
-    
+
     if([self isKindOfClass:[UIImageView class]]) {
         if(((UIImageView*)self).highlighted) {
             printf(" (highlighted)");
@@ -1020,7 +1020,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
             printf(" (not highlighted)");
         }
     }
-    
+
     if([self isKindOfClass:[UIControl class]]) {
         UIControl* ctrl = (UIControl*)self;
         ctrl.enabled ? printf(" (enabled)") : printf(" (not enabled)");
@@ -1028,7 +1028,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
         ctrl.highlighted ? printf(" (highlighted)") : printf(" (not highlighted)");
     }
     printf("\n");
-    
+
     //
     NSInteger numOfAccElements = self.accessibilityElementCount;
     if(numOfAccElements != NSNotFound) {
@@ -1049,7 +1049,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
             printf("\n");
         }
     }
-    
+
     for (UIView *subview in self.subviews) {
         [subview printViewHierarchyWithIndentation:indent+1];
     }
