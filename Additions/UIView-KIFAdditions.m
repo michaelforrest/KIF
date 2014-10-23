@@ -411,6 +411,8 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
 
     [[UIApplication sharedApplication] sendEvent:event];
 
+    [self addTouchIndicatorAtPoint: point];
+
     [touch setPhaseAndUpdateTimestamp:UITouchPhaseEnded];
     [[UIApplication sharedApplication] sendEvent:event];
 
@@ -419,6 +421,20 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
         [self becomeFirstResponder];
     }
 
+}
+-(void)addTouchIndicatorAtPoint:(CGPoint)point{
+    CGFloat size = 48;
+    UIView * indicator = [[UIView alloc] initWithFrame:CGRectMake(point.x - size * 0.5, point.y - size * 0.5, size, size)];
+    indicator.alpha = 0.8;
+    indicator.backgroundColor = [UIColor blueColor];
+    indicator.layer.cornerRadius = size / 2;
+    indicator.userInteractionEnabled = NO;
+    [self addSubview:indicator];
+    [UIView animateWithDuration:1.0 animations:^{
+        indicator.alpha = 0;
+    } completion:^(BOOL finished) {
+        [indicator removeFromSuperview];
+    }];
 }
 
 - (void)twoFingerTapAtPoint:(CGPoint)point {
@@ -546,6 +562,14 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
                 touch = touches[pathIndex];
                 [touch setLocationInWindow:[self.window convertPoint:point fromView:self]];
                 [touch setPhaseAndUpdateTimestamp:UITouchPhaseMoved];
+                [self addTouchIndicatorAtPoint:point];
+                if (pointIndex < pointsInPath - 1) {
+                    [touch setLocationInWindow:[self.window convertPoint:point fromView:self]];
+                    [touch setPhaseAndUpdateTimestamp:UITouchPhaseMoved];
+                }
+                else {
+                    [touch setPhaseAndUpdateTimestamp:UITouchPhaseEnded];
+                }
             }
             UIEvent *event = [self eventWithTouches:[NSArray arrayWithArray:touches]];
             [[UIApplication sharedApplication] sendEvent:event];
